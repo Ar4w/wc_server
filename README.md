@@ -24,3 +24,27 @@ ESP32 собирет показания со счетчиков воды и ав
 Чтобы настроить программу, нужно отредактировать файл wc_server.ino
 Все строки которые там нужно отредактировать помечены фразой //Edit me
 
+```
+const char* ssid1              = "ssid1";                        // Edit me
+const char* ssid2              = "ssid2";                        // Edit me
+const char* password           = "wifi_password";                // Edit me
+const char* ntpServer1         = "ntp3.vniiftri.ru";
+const char* ntpServer2         = "time.nist.gov";
+const long  gmtOffset_sec      = 10800;
+const int   daylightOffset_sec = 0;
+
+#define BOT_TOKEN "your:bot_token"                               // Edit me
+#define CHAT_ID "yourchatid"                                     // Edit me
+
+FastBot bot(BOT_TOKEN);
+
+#define HOT_PIN 23
+#define COL_PIN 18
+
+#define HOT_ID  1111111                                              // Edit me
+#define COL_ID  2222222                                              // Edit me
+```
+Здесь вам нужно настроить ssid своих сетей и пароль от них. У меня на обоих ssid одинаковаый пароль. Если у вас не так, то отредактируйте еще и функции в которой инициализируется wifi
+
+Зарегистрируйте своего telegram бота и узнайте id. Как это делается? в сети масса материалов.
+
