@@ -2,7 +2,7 @@
 #define _mosobleirc_h
 
 //#define LOG_LOCAL_LEVEL ESP_LOG_ERROR
-#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 
 #include <Arduino.h>
 #include <StreamString.h>
