@@ -3,43 +3,23 @@
 
 #include <WiFi.h>
 #include <WiFiMulti.h>
-#include <Preferences.h>
 #include <ArduinoJson.h>
 #include "time.h"
 #include "sntp.h"
 #include "esp_log.h"
-#include <FastBot.h>
+#include "FastBot.h"
 
 #include "mosobleirc.h"
-
-const char* ssid1              = "ssid1";                        // Edit me
-const char* ssid2              = "ssid2";                        // Edit me
-const char* password           = "wifi_password";                // Edit me
-const char* ntpServer1         = "ntp3.vniiftri.ru";
-const char* ntpServer2         = "time.nist.gov";
-const long  gmtOffset_sec      = 10800;
-const int   daylightOffset_sec = 0;
-
-
-#define BOT_TOKEN "your:bot_token"                               // Edit me
-#define CHAT_ID "yourchatid"                                     // Edit me
-
-FastBot bot(BOT_TOKEN);
+#include "saver.h"
 
 #define HOT_PIN 23
 #define COL_PIN 18
 
-#define HOT_ID  1111111                                              // Edit me
-#define COL_ID  2222222                                              // Edit me
-
-Mosobleirc eirc( "eirc_login", "eirc_password", HOT_ID, COL_ID, bot);  // Edit me
-
-#define RW_MODE false
-#define RO_MODE true
+#include "var_git.h"
 
 WiFiMulti WiFiMulti;
 
-Preferences prefs;
+Saver pref( bot );
 
 struct Value {
     const uint8_t PIN;
@@ -205,9 +185,7 @@ int postValuesToEIRC() {
     if ( h_res==1 && c_res==1 ) {
       if(getLocalTime(&curt)){
         lastSent = curt.tm_year * 100 + curt.tm_mon; 
-        prefs.end();
-        prefs.begin("WCPrefs", RW_MODE);
-        prefs.putUInt("lastSent", lastSent );    
+        pref.set_date(lastSent);    
       }
       page = "\xf0\x9f\x9f\xa2 Данные успешно отправлены в ЕИРЦ\nгор : ";
       page += String( int(hot_t.val/100) );
@@ -237,6 +215,7 @@ void correctValues( char* st ) {
     ptr = strtok( (char*)0, " .,-" );
   }
   saveValues( v[0], v[1], v[2] );
+  bot.sendMessage( "\xf0\x9f\x9f\xa2 текущие показания запомнил" );
 }
 
 void newMsg(FB_msg& msg) {
@@ -270,13 +249,11 @@ void saveValues( uint32_t h, uint32_t c, uint32_t d ) {
   // сохраняем данные во flash чтобы пережили reboot
   hot_t.val = h;
   col_t.val = c;
-  prefs.end();
-  prefs.begin("WCPrefs", RW_MODE);
-  prefs.putUInt("hot_t", h );
-  prefs.putUInt("col_t", c );
+  pref.set_hot( h );
+  pref.set_col( c );
   if ( d>0 ) {
     lastSent = d;
-    prefs.putUInt("lastSent", d );
+    pref.set_date( d );
   }
 }
 
@@ -299,9 +276,6 @@ void setup(void) {
   // init wifi
   connectWiFi();
 
-  // init prefs
-  initPrefs();
-  
   // bot settings
   bot.setChatID(CHAT_ID);
   bot.attach(newMsg);
@@ -313,6 +287,12 @@ void setup(void) {
 
   eirc.get();
   log_i( "Got data from eirc. From : %d  To : %d", eirc.date_from, eirc.date_to );
+
+  pref.get();
+  hot_t.val = pref.hot;
+  col_t.val = pref.col;
+  lastSent = pref.date;
+  log_i( "Got pref. Col: %d, Hot: %d, date: %d", pref.col, pref.hot, pref.date );
 }
 
 uint64_t lastTry = 0;
@@ -322,17 +302,13 @@ void loop(void) {
 
     if (hot_t.trig) {
         Serial.printf("Save hot_t: %u \n", hot_t.val);
-        prefs.end();
-        prefs.begin("WCPrefs", RW_MODE);
-        prefs.putUInt("hot_t", hot_t.val );
+        pref.set_hot( hot_t.val );
         hot_t.trig = false;
     }
 
     if (col_t.trig) {
         Serial.printf("Save col_t: %u \n", col_t.val);
-        prefs.end();
-        prefs.begin("WCPrefs", RW_MODE);
-        prefs.putUInt("col_t", col_t.val );
+        pref.set_col( hot_t.val );
         col_t.trig = false;
     }
 
@@ -353,42 +329,12 @@ void loop(void) {
            cur_hour > lastTry ) {
 
         bot.sendMessage( "Пора передать показания. \nкоманда push");
-        //if ( !postValuesToEIRC() ) {
+        if ( !postValuesToEIRC() ) {
           lastTry = cur_hour;
-        //}
+        }
 
       } 
     }  
-}
-
-void initPrefs() {
-  prefs.begin("WCPrefs", RO_MODE);
-  bool valInit = prefs.isKey("hot_t"); //no matter which one hot_t or col_t
-  if (valInit==false) {
-    // create and initialize
-    prefs.end();
-    prefs.begin("WCPrefs", RW_MODE);
-    prefs.putUInt("hot_t", hot_t.val );
-    prefs.putUInt("col_t", col_t.val );
-    prefs.putUInt("lastSent", lastSent );
-  } else {
-    // read current value
-    prefs.end();
-    prefs.begin("WCPrefs", RO_MODE);
-    uint32_t tmp_h_t = prefs.getUInt("hot_t" );
-    uint32_t tmp_c_t = prefs.getUInt("col_t" );
-    lastSent = prefs.getUInt("lastSent" );
-    if (hot_t.val > tmp_h_t || col_t.val > tmp_c_t) {
-      prefs.end();
-      prefs.begin("WCPrefs", RW_MODE);
-      prefs.putUInt("hot_t", hot_t.val );
-      prefs.putUInt("col_t", col_t.val );
-      prefs.putUInt("lastSent", lastSent );
-    } else {
-      hot_t.val = tmp_h_t;
-      col_t.val = tmp_c_t;
-    }
-  }
 }
 
 void connectWiFi() {
