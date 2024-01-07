@@ -228,6 +228,7 @@ void newMsg(FB_msg& msg) {
     eirc.get();
     sendValuesToTelegram();
   } else if ( ms.indexOf("set")>-1 ) {
+    pref.init();
     correctValues( strdup(ms.c_str()) );
   } else if ( ms.indexOf("push")>-1 ) {
     postValuesToEIRC();
@@ -308,7 +309,7 @@ void loop(void) {
 
     if (col_t.trig) {
         Serial.printf("Save col_t: %u \n", col_t.val);
-        pref.set_col( hot_t.val );
+        pref.set_col( col_t.val );
         col_t.trig = false;
     }
 
